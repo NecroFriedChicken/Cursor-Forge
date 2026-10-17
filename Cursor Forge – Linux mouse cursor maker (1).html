@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cursor Forge – Linux mouse cursor maker</title>
+<style>
+:root{--bg:#f6f5f2;--card:#fff;--tx:#1d1d1b;--mu:#66655f;--ac:#d9480f;--bd:#dedcd5;--k1:#e6e6e6;--k2:#fff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161615;--card:#222221;--tx:#efeee9;--mu:#a3a29b;--ac:#ff8a4c;--bd:#3a3a37;--k1:#3a3a3a;--k2:#2c2c2c}}
+:root[data-theme="dark"]{--bg:#161615;--card:#222221;--tx:#efeee9;--mu:#a3a29b;--ac:#ff8a4c;--bd:#3a3a37;--k1:#3a3a3a;--k2:#2c2c2c}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:860px;margin:0 auto;padding:16px}
+h1{margin:8px 0 2px;font-size:1.7rem}h2{font-size:1.1rem;margin:0 0 8px}
+.mu{color:var(--mu);font-size:.92rem}
+section,details{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin:14px 0}
+summary{cursor:pointer;font-weight:600}
+ol,ul{padding-left:1.2rem;margin:8px 0}li{margin:4px 0}
+code{background:var(--k1);padding:1px 6px;border-radius:5px;font-size:.88em;word-break:break-all}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
+input[type=text],select{font:inherit;padding:8px 10px;border-radius:9px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);max-width:100%}
+button,.btn{font:inherit;padding:9px 14px;border-radius:10px;border:1px solid var(--bd);background:var(--card);color:var(--tx);cursor:pointer;display:inline-block}
+.pri{background:var(--ac);color:#fff;border-color:var(--ac);font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:10px}
+.card{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 6px;text-align:center;font-size:.82rem;position:relative}
+.card.on{border-color:var(--ac);box-shadow:0 0 0 2px var(--ac) inset}
+.card .tag{position:absolute;top:4px;right:6px;font-size:.7rem;color:var(--ac)}
+canvas{background:repeating-conic-gradient(var(--k1) 0 25%,var(--k2) 0 50%) 0 0/16px 16px;border-radius:8px;border:1px solid var(--bd)}
+dialog{border:1px solid var(--bd);border-radius:16px;background:var(--card);color:var(--tx);padding:16px;width:min(420px,94vw);max-height:92vh}
+dialog::backdrop{background:rgba(0,0,0,.55)}
+#ec{width:100%;max-width:320px;aspect-ratio:1;display:block;margin:8px auto;touch-action:none;cursor:crosshair}
+#strip{display:flex;gap:6px;overflow-x:auto;padding:4px 0}
+#strip div{position:relative;flex:none}
+#strip button{position:absolute;top:-4px;right:-4px;padding:0 5px;border-radius:50%;font-size:.75rem;line-height:1.3}
+#spd{border:1px solid var(--ac);border-radius:10px;padding:8px 10px;margin:8px 0}
+#spd input{width:100%}
+#msg{min-height:1.4em;color:var(--ac);font-weight:600}
+</style></head><body>
+<main>
+<h1>🖱️ Cursor Forge</h1>
+<p class="mu">Turn your own PNG, JPEG or GIF into a mouse cursor theme for Linux. Everything runs in your browser; nothing is uploaded.</p>
+
+<details open><summary>How this page works (start here)</summary>
+<ol>
+<li><b>Pick a cursor</b> from the grid below. Each tile is one of the pointers Linux uses (arrow, hand, text, busy, resize…). The tiles show simple built-in defaults.</li>
+<li><b>Choose your image</b> in the window that opens. Pick one image, or <b>several images</b> (they become animation frames, ordered by file name), or an <b>animated GIF</b>.</li>
+<li><b>Set the hotspot</b>: tap or drag on the preview to mark the exact pixel that counts as the click point (for an arrow, its tip).</li>
+<li>If there is more than one frame, a <b>speed slider</b> appears. Drag it to change the time per frame.</li>
+<li>Repeat for any cursors you want to change. Choose your Linux type and sizes, name your theme, then press <b>Build &amp; download</b>.</li>
+</ol>
+<p class="mu">Tip: use a square-ish image with a transparent background (PNG or GIF). Images are scaled to fit a square, so a 128×128 or larger source looks best. Animated GIFs need a Chromium-based browser (Chrome, Edge, Brave); in other browsers upload the frames as separate images instead.</p>
+</details>
+
+<section>
+<h2>Theme settings</h2>
+<div class="row"><label>Theme name <input type="text" id="nm" value="MyCursor" maxlength="40"></label></div>
+<div class="row"><label>Linux type <select id="tg">
+<option value="ubuntu">Ubuntu / GNOME (Ubuntu, Pop!_OS, Zorin…)</option>
+<option value="kde">KDE Plasma (Kubuntu, KDE neon…)</option>
+<option value="other">Other (Xfce, Cinnamon, MATE, any Linux)</option></select></label></div>
+<div class="row">Sizes (px): <span id="szs"></span></div>
+<div class="row"><label><input type="checkbox" id="oc" checked> Only include cursors I customised (the rest fall back to the Adwaita cursors)</label></div>
+<div class="row"><button class="pri" id="bd">Build &amp; download</button><span id="msg" role="status"></span></div>
+</section>
+
+<section><h2>Cursors</h2><p class="mu">Tap a tile to edit it. Tiles marked “custom” will be included in your theme.</p><div class="grid" id="grid"></div></section>
+
+<details open><summary>How to install your cursor file</summary>
+<p class="mu">The download is a <code>.zip</code> containing a standard Xcursor theme, which works on X11 and Wayland. Steps for the selected Linux type:</p>
+<ol id="ins"></ol>
+<p class="mu">Not changing? Log out and back in. Flatpak/Snap apps may need the theme in <code>~/.icons</code> as well. For all users run <code>sudo cp -r NAME /usr/share/icons/</code>.</p>
+</details>
+</main>
+
+<dialog id="ed">
+<div class="row" style="justify-content:space-between"><b id="et"></b><button id="ex">✕</button></div>
+<canvas id="ec" width="256" height="256"></canvas>
+<p class="mu" style="margin:0">Tap or drag the preview to set the hotspot. <b id="hs"></b></p>
+<div class="row"><button id="hTL">Top-left</button><button id="hC">Centre</button></div>
+<div class="row">
+<label class="btn pri">Choose image(s) / GIF<input type="file" id="f1" multiple accept="image/png,image/jpeg,image/gif" hidden></label>
+<label class="btn">Add frames<input type="file" id="f2" multiple accept="image/png,image/jpeg,image/gif" hidden></label></div>
+<div id="strip"></div>
+<div id="spd" hidden><label>Animation speed: <b id="sv"></b><input type="range" id="sl" min="20" max="1000" step="10"></label><div class="mu">Left = fast, right = slow (time per frame)</div></div>
+<div class="row"><button id="rs">Reset to default</button><button class="pri" id="ok">Done</button></div>
+</dialog>
+
+<script>
+const $=id=>document.getElementById(id),MAXF=60;
+const A='M8 6V48L19 38L27 56L35 52L27 35H42Z';
+// id,label,aliases,filled path,line path,hotX,hotY (64-grid)
+const SL=[
+['default','Arrow','left_ptr default arrow top_left_arrow',A,'',8,6],
+['pointer','Hand (mouse over link)','pointer hand1 hand2 pointing_hand 9d800788f1b08800ae810202380a0822 e29285e634086352946a0e7090d73106','M24 6Q28 6 28 10V28H32Q35 28 35 31H38Q41 31 41 34H44Q47 34 47 37V48Q47 56 39 60H23Q17 52 11 42Q9 39 12 38Q15 37 17 40L21 44V10Q21 6 24 6Z','',24,6],
+['text','Text (I-beam)','text xterm ibeam','','M22 8H42M32 8V56M22 56H42',32,32],
+['wait','Busy (wait)','wait watch','M20 8H44V14L32 32L44 50V56H20V50L32 32L20 14Z','',32,32],
+['progress','Working in background','progress left_ptr_watch 08e8e1c95fe2fc01f976f1e063a24ccd 3ecb610c1bf2410f44200f48c40d3599',A+'M38 46a8 8 0 1 0 16 0a8 8 0 1 0-16 0','',8,6],
+['help','Help','help question_arrow whats_this d9ce0ab605698f320427677b458ad60b 5c6cd98b3f3ebcb1f9c7f1c204630408',A,'M40 40C40 34 52 34 52 40C52 45 46 45 46 50M46 55V56',8,6],
+['crosshair','Crosshair','crosshair cross tcross','','M32 6V58M6 32H58',32,32],
+['move','Move','move fleur size_all all-scroll 4498f0e0c1937ffe01fd06f973665830 9081237383d90e509aa00f00170e968f','','M32 6V58M6 32H58M26 12L32 6L38 12M26 52L32 58L38 52M12 26L6 32L12 38M52 26L58 32L52 38',32,32],
+['grab','Open hand (grab)','grab openhand hand','M18 30Q18 24 24 24H44Q52 24 52 32V44Q52 54 42 56H28Q18 52 18 42Z','M26 24V32M34 24V32M42 24V32',32,32],
+['grabbing','Closed hand (grabbing)','grabbing closedhand dnd-none fcf21c00b30f7e3f83fe0dfd12e71cff','M18 32Q18 26 24 26H44Q52 26 52 34V44Q52 54 42 56H28Q18 52 18 44Z','',32,32],
+['not-allowed','Not allowed','not-allowed crossed_circle forbidden circle 03b6e0fcb3499374a867c041f52298f0','','M32 8a24 24 0 1 0 .01 0ZM15 15L49 49',32,32],
+['copy','Copy','copy dnd-copy 1081e37283d90000800003c07f3ef6bf 6407b0e94181790501fd1e167b474872',A,'M46 38V54M38 46H54',8,6],
+['alias','Alias / shortcut','alias dnd-link',A,'M38 54L52 40M42 40H52V50',8,6],
+['context-menu','Context menu','context-menu',A,'M38 40H54M38 47H54M38 54H54',8,6],
+['zoom-in','Zoom in','zoom-in','','M26 12a14 14 0 1 0 .01 0ZM36 36L54 54M20 26H32M26 20V32',26,26],
+['zoom-out','Zoom out','zoom-out','','M26 12a14 14 0 1 0 .01 0ZM36 36L54 54M20 26H32',26,26],
+['cell','Cell / plus','cell plus','M26 8H38V26H56V38H38V56H26V38H8V26H26Z','',32,32],
+['ew','Resize left-right','ew-resize sb_h_double_arrow h_double_arrow size_hor col-resize split_h left_side right_side 14fef782d02440884392942c11205230 028006030e0e7ebffc7f7070c0600140','','M6 32H58M14 24L6 32L14 40M50 24L58 32L50 40',32,32],
+['ns','Resize up-down','ns-resize sb_v_double_arrow v_double_arrow size_ver row-resize split_v top_side bottom_side 2870a09082c103050810ffdffffe0204 00008160000006810000408080010102','','M32 6V58M24 14L32 6L40 14M24 50L32 58L40 50',32,32],
+['nesw','Resize diagonal ⤢','nesw-resize size_bdiag fd_double_arrow top_right_corner bottom_left_corner fcf1c3c7cd4491d801f1e1c78f100000','','M12 52L52 12M12 52V40M12 52H24M52 12V24M52 12H40',32,32],
+['nwse','Resize diagonal ⤡','nwse-resize size_fdiag bd_double_arrow top_left_corner bottom_right_corner c7088f0f3e6c8088236ef8e1e3e70000','','M12 12L52 52M12 12V24M12 12H24M52 52V40M52 52H40',32,32]];
+const S={};let cur=null;
+const svgOf=x=>'data:image/svg+xml,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 64 64" stroke-linejoin="round" stroke-linecap="round"><path d="${x[3]}" fill="#fff" stroke="#111" stroke-width="3"/><path d="${x[4]}" fill="none" stroke="#111" stroke-width="7"/><path d="${x[4]}" fill="none" stroke="#fff" stroke-width="3"/></svg>`);
+async function fresh(x){const i=new Image();i.src=svgOf(x);await i.decode();return{frames:[{img:i}],hx:x[5]/64,hy:x[6]/64,delay:100,custom:false}}
+function drawFit(c,img,s){const w=img.naturalWidth||img.width,h=img.naturalHeight||img.height,k=Math.min(s/w,s/h);c.drawImage(img,(s-w*k)/2,(s-h*k)/2,w*k,h*k)}
+const fidx=s=>s.frames.length>1?Math.floor(performance.now()/s.delay)%s.frames.length:0;
+const msg=t=>{$('msg').textContent=t;if(t)setTimeout(()=>{if($('msg').textContent===t)$('msg').textContent=''},6000)};
+
+function drawCard(x){const s=S[x[0]],c=x.cv.getContext('2d');c.clearRect(0,0,64,64);drawFit(c,s.frames[fidx(s)].img,64);x.tag.textContent=s.custom?'custom':''; x.el.classList.toggle('on',s.custom)}
+function drawEd(){if(!cur)return;const s=S[cur[0]],c=$('ec').getContext('2d');c.clearRect(0,0,256,256);drawFit(c,s.frames[fidx(s)].img,256);
+ const X=s.hx*256,Y=s.hy*256;c.strokeStyle='#e03131';c.lineWidth=2;c.beginPath();c.moveTo(X,0);c.lineTo(X,256);c.moveTo(0,Y);c.lineTo(256,Y);c.stroke();c.beginPath();c.arc(X,Y,6,0,7);c.stroke()}
+function refreshEd(){const s=S[cur[0]],n=s.frames.length;$('hs').textContent=`(${Math.round(s.hx*64)}, ${Math.round(s.hy*64)} on a 64 px grid)`;
+ $('spd').hidden=n<2;$('sl').value=s.delay;$('sv').textContent=`${s.delay} ms (~${(1000/s.delay).toFixed(1)} fps), ${n} frames`;
+ const st=$('strip');st.innerHTML='';if(s.custom)s.frames.forEach((f,i)=>{const d=document.createElement('div'),c=document.createElement('canvas');c.width=c.height=40;drawFit(c.getContext('2d'),f.img,40);const b=document.createElement('button');b.textContent='×';b.title='Remove frame';b.onclick=async()=>{s.frames.splice(i,1);if(!s.frames.length)Object.assign(s,await fresh(cur));refreshEd()};d.append(c,b);st.append(d)})}
+function open(x){cur=x;$('et').textContent=x[1];refreshEd();$('ed').showModal()}
+async function load(files,append){
+ files=[...files].sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));const s=S[cur[0]];let fr=append&&s.custom?[...s.frames]:[],d=0;
+ for(const f of files){try{
+  if((f.type==='image/gif'||/\.gif$/i.test(f.name))&&window.ImageDecoder){
+   const dec=new ImageDecoder({data:f.stream(),type:'image/gif'});await dec.tracks.ready;const n=Math.min(dec.tracks.selectedTrack.frameCount,MAXF);let t=0;
+   for(let i=0;i<n;i++){const r=await dec.decode({frameIndex:i});fr.push({img:await createImageBitmap(r.image)});t+=(r.image.duration||100000)/1000;r.image.close()}
+   if(n>1)d=t/n}
+  else fr.push({img:await createImageBitmap(f)})}catch(e){msg('Could not read '+f.name)}}
+ if(!fr.length)return;if(fr.length>MAXF){fr=fr.slice(0,MAXF);msg('Limited to '+MAXF+' frames')}
+ s.frames=fr;s.custom=true;if(d)s.delay=Math.min(1000,Math.max(20,Math.round(d)));refreshEd()}
+$('f1').onchange=e=>{load(e.target.files,false);e.target.value=''};
+$('f2').onchange=e=>{load(e.target.files,true);e.target.value=''};
+$('sl').oninput=e=>{S[cur[0]].delay=+e.target.value;refreshEd()};
+$('hTL').onclick=()=>{Object.assign(S[cur[0]],{hx:0,hy:0});refreshEd()};
+$('hC').onclick=()=>{Object.assign(S[cur[0]],{hx:.5,hy:.5});refreshEd()};
+$('rs').onclick=async()=>{Object.assign(S[cur[0]],await fresh(cur));refreshEd()};
+$('ok').onclick=$('ex').onclick=()=>$('ed').close();
+$('ed').onclose=()=>{SL.forEach(drawCard);cur=null};
+const pick=e=>{const r=$('ec').getBoundingClientRect(),s=S[cur[0]];s.hx=Math.min(1,Math.max(0,(e.clientX-r.left)/r.width));s.hy=Math.min(1,Math.max(0,(e.clientY-r.top)/r.height));$('hs').textContent=`(${Math.round(s.hx*64)}, ${Math.round(s.hy*64)} on a 64 px grid)`};
+let dn=false;$('ec').onpointerdown=e=>{dn=true;$('ec').setPointerCapture(e.pointerId);pick(e)};$('ec').onpointermove=e=>dn&&pick(e);$('ec').onpointerup=()=>dn=false;
+setInterval(()=>{SL.forEach(x=>S[x[0]].frames.length>1&&drawCard(x));drawEd()},40);
+
+/* ---- Xcursor encoder ---- */
+function xcur(s,sizes){const im=[];
+ for(const z of sizes){const cv=document.createElement('canvas');cv.width=cv.height=z;const c=cv.getContext('2d',{willReadFrequently:true});c.imageSmoothingQuality='high';
+  for(const f of s.frames){c.clearRect(0,0,z,z);drawFit(c,f.img,z);const d=c.getImageData(0,0,z,z).data,p=new Uint8Array(z*z*4);
+   for(let i=0;i<d.length;i+=4){const a=d[i+3];p[i]=d[i+2]*a/255|0;p[i+1]=d[i+1]*a/255|0;p[i+2]=d[i]*a/255|0;p[i+3]=a}
+   im.push({z,p,x:Math.min(z-1,Math.round(s.hx*z)),y:Math.min(z-1,Math.round(s.hy*z))})}}
+ const n=im.length,hd=16+n*12;let tot=hd;im.forEach(i=>tot+=36+i.p.length);
+ const b=new Uint8Array(tot),v=new DataView(b.buffer),dl=s.frames.length>1?s.delay:0;
+ [0x72756358,16,0x10000,n].forEach((q,i)=>v.setUint32(i*4,q,true));let pos=hd;
+ im.forEach((i,k)=>{const t=16+k*12;v.setUint32(t,0xfffd0002,true);v.setUint32(t+4,i.z,true);v.setUint32(t+8,pos,true);
+  [36,0xfffd0002,i.z,1,i.z,i.z,i.x,i.y,dl].forEach((q,j)=>v.setUint32(pos+j*4,q,true));b.set(i.p,pos+36);pos+=36+i.p.length});
+ return b}
+
+/* ---- store-only ZIP writer ---- */
+const T=new Uint32Array(256).map((_,n)=>{for(let k=0;k<8;k++)n=n&1?0xEDB88320^(n>>>1):n>>>1;return n>>>0});
+const crc=d=>{let c=-1;for(let i=0;i<d.length;i++)c=T[(c^d[i])&255]^(c>>>8);return(c^-1)>>>0};
+function zip(files){const e=new TextEncoder(),out=[],cd=[],n=new Date(),dt=((n.getFullYear()-1980)<<9)|((n.getMonth()+1)<<5)|n.getDate();let off=0;
+ for(const f of files){const nm=e.encode(f.n),c=crc(f.d),L=new DataView(new ArrayBuffer(30)),C=new DataView(new ArrayBuffer(46));
+  L.setUint32(0,0x04034b50,true);L.setUint16(4,20,true);L.setUint16(6,0x800,true);L.setUint16(12,dt,true);L.setUint32(14,c,true);L.setUint32(18,f.d.length,true);L.setUint32(22,f.d.length,true);L.setUint16(26,nm.length,true);
+  C.setUint32(0,0x02014b50,true);C.setUint16(4,0x031e,true);C.setUint16(6,20,true);C.setUint16(8,0x800,true);C.setUint16(14,dt,true);C.setUint32(16,c,true);C.setUint32(20,f.d.length,true);C.setUint32(24,f.d.length,true);C.setUint16(28,nm.length,true);C.setUint32(38,((f.x?0o100755:0o100644)<<16)>>>0,true);C.setUint32(42,off,true);
+  out.push(L,nm,f.d);cd.push(C,nm);off+=30+nm.length+f.d.length}
+ let cs=0;cd.forEach(p=>cs+=p.byteLength||p.length);const E=new DataView(new ArrayBuffer(22));
+ E.setUint32(0,0x06054b50,true);E.setUint16(8,files.length,true);E.setUint16(10,files.length,true);E.setUint32(12,cs,true);E.setUint32(16,off,true);
+ return new Blob([...out,...cd,E])}
+
+/* ---- install text ---- */
+const nmv=()=>(($('nm').value.trim()||'MyCursor').replace(/[^\w-]/g,'_').replace(/^-+/,'')||'MyCursor');
+function script(n,t){const dest=t==='other'?'$HOME/.icons':'$HOME/.local/share/icons';
+ const act={ubuntu:'gsettings set org.gnome.desktop.interface cursor-theme "$NAME" 2>/dev/null || echo "Select it in GNOME Tweaks > Appearance > Cursor"',
+ kde:'plasma-apply-cursortheme "$NAME" 2>/dev/null || echo "Select it in System Settings > Appearance > Cursors"',
+ other:'xfconf-query -c xsettings -p /Gtk/CursorThemeName -s "$NAME" 2>/dev/null || true\ngsettings set org.gnome.desktop.interface cursor-theme "$NAME" 2>/dev/null || true\necho "If it did not change, select it in your desktop Appearance/Mouse settings."'}[t];
+ return `#!/bin/sh\nset -e\nNAME="${n}"\nDEST="${dest}"\ncd "$(dirname "$0")"\nmkdir -p "$DEST"\nrm -rf "$DEST/$NAME"\ncp -r "$NAME" "$DEST/"\n${act}\necho "Installed $NAME into $DEST"\n`}
+function inst(){const n=nmv(),t=$('tg').value,p=t==='other'?'~/.icons':'~/.local/share/icons';
+ const last={ubuntu:`Open <b>GNOME Tweaks</b> (<code>sudo apt install gnome-tweaks</code>) → <b>Appearance → Cursor</b> and choose <b>${n}</b>. Or run <code>gsettings set org.gnome.desktop.interface cursor-theme '${n}'</code>.`,
+ kde:`Open <b>System Settings → Appearance → Cursors</b> and choose <b>${n}</b>, then press Apply.`,
+ other:`Xfce: <b>Settings → Mouse and Touchpad → Theme</b>. Cinnamon: <b>Themes → Mouse Pointer</b>. MATE: <b>Appearance → Pointer</b>. Others: create <code>~/.icons/default/index.theme</code> containing <code>[Icon Theme]</code> and <code>Inherits=${n}</code>.`}[t];
+ $('ins').innerHTML=`<li>Unzip <code>${n}.zip</code>. You get a folder <code>${n}</code> and a file <code>install.sh</code>.</li>
+<li><b>Easy way:</b> open a terminal in that folder and run <code>sh install.sh</code>. It copies the theme to <code>${p}</code> and activates it.</li>
+<li><b>Manual way:</b> copy the <code>${n}</code> folder into <code>${p}</code> (create the folder if needed), then:</li>
+<li>${last}</li>`}
+$('tg').onchange=$('nm').oninput=inst;
+
+/* ---- build ---- */
+$('bd').onclick=async()=>{const n=nmv(),t=$('tg').value,only=$('oc').checked,list=SL.filter(x=>!only||S[x[0]].custom),sizes=[...document.querySelectorAll('.sz:checked')].map(e=>+e.value);
+ if(!list.length)return msg('Customise at least one cursor first, or untick “Only include…”.');
+ if(!sizes.length)return msg('Select at least one size.');
+ $('bd').disabled=true;msg('Building…');await new Promise(r=>setTimeout(r,30));
+ try{const e=new TextEncoder(),files=[{n:n+'/index.theme',d:e.encode(`[Icon Theme]\nName=${n}\nComment=Made with Cursor Forge\nInherits=Adwaita\n`)}];
+  for(const x of list){const b=xcur(S[x[0]],sizes);for(const a of x[2].split(' '))files.push({n:`${n}/cursors/${a}`,d:b})}
+  files.push({n:'install.sh',d:e.encode(script(n,t)),x:1});const tot=files.reduce((a,f)=>a+f.d.length,0);if(tot>150e6)throw new Error('Theme would be '+Math.round(tot/1e6)+' MB; use fewer sizes, fewer frames or fewer animated cursors.');
+  const blob=zip(files),dl=window.claude?await window.claude.use('downloads'):null;
+  if(dl)await dl.save({filename:n+'.zip',data:blob});
+  else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=n+'.zip';a.click()}
+  msg('Done! See the install steps below.')}
+ catch(err){msg(err&&err.code==='declined'?'Download cancelled.':'Build failed: '+(err.message||err))}
+ $('bd').disabled=false};
+
+/* ---- init ---- */
+$('szs').innerHTML=[24,32,48,64,96].map(z=>`<label style="margin-right:8px"><input type="checkbox" class="sz" value="${z}" ${z<96?'checked':''}> ${z}</label>`).join('');
+(async()=>{for(const x of SL){S[x[0]]=await fresh(x);const b=document.createElement('button');b.className='card';b.innerHTML='<span class="tag"></span><canvas width="64" height="64" style="width:64px;height:64px"></canvas><span>'+x[1]+'</span>';x.el=b;x.cv=b.querySelector('canvas');x.tag=b.querySelector('.tag');b.onclick=()=>open(x);$('grid').append(b);drawCard(x)}})();
+inst();
+</script></body></html>
