@@ -1,0 +1,953 @@
+<!doctype html>
+<!--
+  CURSOR FORGE
+  Turns PNG / JPEG / GIF images into a Linux (Xcursor) mouse-cursor theme,
+  entirely inside the browser. Output is a .zip with the theme and install.sh.
+
+  FILE LAYOUT
+    1. <style>   Styles (colour tokens, layout, tiles, editor dialog)
+    2. <body>    Page markup (help text, settings, cursor grid, install help)
+    3. <dialog>  The cursor editor window
+    4. <script>  Application code, in numbered sections (see the banners)
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cursor Forge – Linux mouse cursor maker</title>
+
+<style>
+/* ===== Colour tokens (light theme is the default) ===== */
+:root {
+  --bg: #f6f5f2;       /* page background */
+  --card: #ffffff;     /* panels and buttons */
+  --tx: #1d1d1b;       /* main text */
+  --mu: #66655f;       /* muted text */
+  --ac: #d9480f;       /* accent colour */
+  --bd: #dedcd5;       /* borders */
+  --k1: #e6e6e6;      /* checkerboard colour 1 (shows transparency) */
+  --k2: #ffffff;       /* checkerboard colour 2 */
+  box-sizing: border-box;
+  /* keep content clear of phone notches / system bars */
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ===== Dark theme: follows the system unless the page forces light ===== */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161615; --card: #222221; --tx: #efeee9; --mu: #a3a29b;
+    --ac: #ff8a4c; --bd: #3a3a37; --k1: #3a3a3a; --k2: #2c2c2c;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #161615; --card: #222221; --tx: #efeee9; --mu: #a3a29b;
+  --ac: #ff8a4c; --bd: #3a3a37; --k1: #3a3a3a; --k2: #2c2c2c;
+}
+
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+* { box-sizing: border-box; }
+
+/* ===== Page basics ===== */
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--tx);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+main { max-width: 860px; margin: 0 auto; padding: 16px; }
+h1 { margin: 8px 0 2px; font-size: 1.7rem; }
+h2 { margin: 0 0 8px; font-size: 1.1rem; }
+.mu { color: var(--mu); font-size: .92rem; }
+
+/* Panels */
+section, details {
+  background: var(--card);
+  border: 1px solid var(--bd);
+  border-radius: 14px;
+  padding: 14px;
+  margin: 14px 0;
+}
+summary { cursor: pointer; font-weight: 600; }
+ol, ul { padding-left: 1.2rem; margin: 8px 0; }
+li { margin: 4px 0; }
+code {
+  background: var(--k1);
+  padding: 1px 6px;
+  border-radius: 5px;
+  font-size: .88em;
+  word-break: break-all;
+}
+
+/* ===== Form controls ===== */
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+input[type=text], select {
+  font: inherit;
+  padding: 8px 10px;
+  border-radius: 9px;
+  border: 1px solid var(--bd);
+  background: var(--bg);
+  color: var(--tx);
+  max-width: 100%;
+}
+button, .btn {            /* .btn lets a <label> look like a button */
+  font: inherit;
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--bd);
+  background: var(--card);
+  color: var(--tx);
+  cursor: pointer;
+  display: inline-block;
+}
+.pri { background: var(--ac); color: #fff; border-color: var(--ac); font-weight: 600; }
+#message { min-height: 1.4em; color: var(--ac); font-weight: 600; }
+
+/* ===== Cursor grid (one tile per cursor type) ===== */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 10px; }
+.card {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 10px 6px;
+  text-align: center;
+  font-size: .82rem;
+}
+.card.on  { border-color: var(--ac); box-shadow: 0 0 0 2px var(--ac) inset; }  /* customised tile */
+.card .tag { position: absolute; top: 4px; right: 6px; font-size: .7rem; color: var(--ac); }
+
+/* Checkerboard behind every canvas so transparency is visible */
+canvas {
+  background: repeating-conic-gradient(var(--k1) 0 25%, var(--k2) 0 50%) 0 0 / 16px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--bd);
+}
+
+/* ===== Editor dialog ===== */
+dialog {
+  border: 1px solid var(--bd);
+  border-radius: 16px;
+  background: var(--card);
+  color: var(--tx);
+  padding: 16px;
+  width: min(420px, 94vw);
+  max-height: 92vh;
+}
+dialog::backdrop { background: rgba(0, 0, 0, .55); }
+#editorCanvas {
+  width: 100%; max-width: 320px; aspect-ratio: 1;
+  display: block; margin: 8px auto;
+  touch-action: none;            /* let us handle drags ourselves */
+  cursor: crosshair;
+}
+#frameStrip { display: flex; gap: 6px; overflow-x: auto; padding: 4px 0; }
+#frameStrip div { position: relative; flex: none; }
+#frameStrip button {             /* the little × on each frame thumbnail */
+  position: absolute; top: -4px; right: -4px;
+  padding: 0 5px; border-radius: 50%; font-size: .75rem; line-height: 1.3;
+}
+#speedBox { border: 1px solid var(--ac); border-radius: 10px; padding: 8px 10px; margin: 8px 0; }
+#speedBox input { width: 100%; }
+</style>
+</head>
+
+<body>
+<main>
+  <h1>🖱️ Cursor Forge</h1>
+  <p class="mu">Turn your own PNG, JPEG or GIF into a mouse cursor theme for Linux. Everything runs in your browser; nothing is uploaded.</p>
+
+  <!-- ===== Beginner help: how the page works ===== -->
+  <details open>
+    <summary>How this page works (start here)</summary>
+    <ol>
+      <li><b>Pick a cursor</b> from the grid below. Each tile is one of the pointers Linux uses (arrow, hand, text, busy, resize…). The tiles show simple built-in defaults.</li>
+      <li><b>Choose your image</b> in the window that opens. Pick one image, or <b>several images</b> (they become animation frames, ordered by file name), or an <b>animated GIF</b>.</li>
+      <li><b>Set the hotspot</b>: tap or drag on the preview to mark the exact pixel that counts as the click point (for an arrow, its tip).</li>
+      <li>If there is more than one frame, a <b>speed slider</b> appears. Drag it to change the time per frame.</li>
+      <li>Repeat for any cursors you want to change. Choose your Linux type and sizes, name your theme, then press <b>Build &amp; download</b>.</li>
+    </ol>
+    <p class="mu">Tip: use a square-ish image with a transparent background (PNG or GIF). Images are scaled to fit a square, so a 128×128 or larger source looks best. Animated GIFs need a Chromium-based browser (Chrome, Edge, Brave); in other browsers upload the frames as separate images instead.</p>
+  </details>
+
+  <!-- ===== Theme settings ===== -->
+  <section>
+    <h2>Theme settings</h2>
+    <div class="row">
+      <label>Theme name <input type="text" id="themeName" value="MyCursor" maxlength="40"></label>
+    </div>
+    <div class="row">
+      <label>Linux type
+        <select id="linuxType">
+          <option value="ubuntu">Ubuntu / GNOME (Ubuntu, Pop!_OS, Zorin…)</option>
+          <option value="kde">KDE Plasma (Kubuntu, KDE neon…)</option>
+          <option value="other">Other (Xfce, Cinnamon, MATE, any Linux)</option>
+        </select>
+      </label>
+    </div>
+    <div class="row">Sizes (px): <span id="sizeBoxes"></span></div>  <!-- filled by script -->
+    <div class="row">
+      <label><input type="checkbox" id="onlyCustom" checked> Only include cursors I customised (the rest fall back to the Adwaita cursors)</label>
+    </div>
+    <div class="row">
+      <button class="pri" id="buildBtn">Build &amp; download</button>
+      <span id="message" role="status"></span>
+    </div>
+  </section>
+
+  <!-- ===== Cursor grid (tiles added by script) ===== -->
+  <section>
+    <h2>Cursors</h2>
+    <p class="mu">Tap a tile to edit it. Tiles marked “custom” will be included in your theme.</p>
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <!-- ===== Install help (steps rewritten by script for the chosen Linux type) ===== -->
+  <details open>
+    <summary>How to install your cursor file</summary>
+    <p class="mu">The download is a <code>.zip</code> containing a standard Xcursor theme, which works on X11 and Wayland. Steps for the selected Linux type:</p>
+    <ol id="installSteps"></ol>
+    <p class="mu">Not changing? Log out and back in. Flatpak/Snap apps may need the theme in <code>~/.icons</code> as well. For all users run <code>sudo cp -r NAME /usr/share/icons/</code>.</p>
+  </details>
+</main>
+
+<!-- ===== Cursor editor window ===== -->
+<dialog id="editor">
+  <div class="row" style="justify-content: space-between">
+    <b id="editorTitle"></b>
+    <button id="closeBtn">✕</button>
+  </div>
+
+  <canvas id="editorCanvas" width="256" height="256"></canvas>
+  <p class="mu" style="margin: 0">Tap or drag the preview to set the hotspot. <b id="hotspotText"></b></p>
+  <div class="row">
+    <button id="hotTopLeft">Top-left</button>
+    <button id="hotCenter">Centre</button>
+  </div>
+
+  <div class="row">
+    <label class="btn pri">Choose image(s) / GIF
+      <input type="file" id="fileReplace" multiple accept="image/png,image/jpeg,image/gif" hidden>
+    </label>
+    <label class="btn">Add frames
+      <input type="file" id="fileAdd" multiple accept="image/png,image/jpeg,image/gif" hidden>
+    </label>
+  </div>
+
+  <div id="frameStrip"></div>
+
+  <!-- Only shown when the cursor has 2+ frames -->
+  <div id="speedBox" hidden>
+    <label>Animation speed: <b id="speedLabel"></b>
+      <input type="range" id="speedSlider" min="20" max="1000" step="10">
+    </label>
+    <div class="mu">Left = fast, right = slow (time per frame)</div>
+  </div>
+
+  <div class="row">
+    <button id="resetBtn">Reset to default</button>
+    <button class="pri" id="doneBtn">Done</button>
+  </div>
+</dialog>
+
+<script>
+/* =====================================================================
+   SECTION 1. SETTINGS AND SMALL HELPERS
+   ===================================================================== */
+
+const byId = id => document.getElementById(id);   // shorthand for getElementById
+
+const MAX_FRAMES      = 60;       // most animation frames kept per cursor
+const MAX_ZIP_BYTES   = 150e6;    // refuse to build a theme bigger than this
+const TICK_MS         = 40;       // how often animated previews refresh
+const ALL_SIZES       = [24, 32, 48, 64, 96];   // cursor pixel sizes offered
+const DEFAULT_SIZES   = [24, 32, 48, 64];       // sizes ticked by default
+const ART_GRID        = 64;       // default cursor art is drawn on a 64x64 grid
+
+/* Show a short status message (e.g. errors); it clears itself after 6 s. */
+function showMessage(text) {
+  const box = byId('message');
+  box.textContent = text;
+  if (text) {
+    setTimeout(() => { if (box.textContent === text) box.textContent = ''; }, 6000);
+  }
+}
+
+
+/* =====================================================================
+   SECTION 2. CURSOR DEFINITIONS
+
+   Each entry describes one cursor type:
+     id      short unique key
+     label   name shown on the tile
+     names   every file name Linux may look for (space separated).
+             The theme writes one copy of the cursor under each name.
+     filled  SVG path(s) for the built-in default art, drawn white with outline
+     lines   SVG path(s) for stroke-only default art
+     hot     default hotspot [x, y] on the 64x64 art grid
+   ===================================================================== */
+
+const ARROW = 'M8 6V48L19 38L27 56L35 52L27 35H42Z';   // shape reused by several cursors
+
+const CURSOR_SLOTS = [
+  // --- Pointers ---
+  { id: 'default', label: 'Arrow', names: 'left_ptr default arrow top_left_arrow',
+    filled: ARROW, lines: '', hot: [8, 6] },
+
+  { id: 'pointer', label: 'Hand (mouse over link)',
+    names: 'pointer hand1 hand2 pointing_hand 9d800788f1b08800ae810202380a0822 e29285e634086352946a0e7090d73106',
+    filled: 'M24 6Q28 6 28 10V28H32Q35 28 35 31H38Q41 31 41 34H44Q47 34 47 37V48Q47 56 39 60H23Q17 52 11 42Q9 39 12 38Q15 37 17 40L21 44V10Q21 6 24 6Z',
+    lines: '', hot: [24, 6] },
+
+  { id: 'text', label: 'Text (I-beam)', names: 'text xterm ibeam',
+    filled: '', lines: 'M22 8H42M32 8V56M22 56H42', hot: [32, 32] },
+
+  // --- Busy / help ---
+  { id: 'wait', label: 'Busy (wait)', names: 'wait watch',
+    filled: 'M20 8H44V14L32 32L44 50V56H20V50L32 32L20 14Z', lines: '', hot: [32, 32] },
+
+  { id: 'progress', label: 'Working in background',
+    names: 'progress left_ptr_watch 08e8e1c95fe2fc01f976f1e063a24ccd 3ecb610c1bf2410f44200f48c40d3599',
+    filled: ARROW + 'M38 46a8 8 0 1 0 16 0a8 8 0 1 0-16 0', lines: '', hot: [8, 6] },
+
+  { id: 'help', label: 'Help',
+    names: 'help question_arrow whats_this d9ce0ab605698f320427677b458ad60b 5c6cd98b3f3ebcb1f9c7f1c204630408',
+    filled: ARROW, lines: 'M40 40C40 34 52 34 52 40C52 45 46 45 46 50M46 55V56', hot: [8, 6] },
+
+  // --- Selection / movement ---
+  { id: 'crosshair', label: 'Crosshair', names: 'crosshair cross tcross',
+    filled: '', lines: 'M32 6V58M6 32H58', hot: [32, 32] },
+
+  { id: 'move', label: 'Move',
+    names: 'move fleur size_all all-scroll 4498f0e0c1937ffe01fd06f973665830 9081237383d90e509aa00f00170e968f',
+    filled: '', lines: 'M32 6V58M6 32H58M26 12L32 6L38 12M26 52L32 58L38 52M12 26L6 32L12 38M52 26L58 32L52 38', hot: [32, 32] },
+
+  { id: 'grab', label: 'Open hand (grab)', names: 'grab openhand hand',
+    filled: 'M18 30Q18 24 24 24H44Q52 24 52 32V44Q52 54 42 56H28Q18 52 18 42Z',
+    lines: 'M26 24V32M34 24V32M42 24V32', hot: [32, 32] },
+
+  { id: 'grabbing', label: 'Closed hand (grabbing)',
+    names: 'grabbing closedhand dnd-none fcf21c00b30f7e3f83fe0dfd12e71cff',
+    filled: 'M18 32Q18 26 24 26H44Q52 26 52 34V44Q52 54 42 56H28Q18 52 18 44Z', lines: '', hot: [32, 32] },
+
+  // --- Drag and drop / status ---
+  { id: 'not-allowed', label: 'Not allowed',
+    names: 'not-allowed crossed_circle forbidden circle 03b6e0fcb3499374a867c041f52298f0',
+    filled: '', lines: 'M32 8a24 24 0 1 0 .01 0ZM15 15L49 49', hot: [32, 32] },
+
+  { id: 'copy', label: 'Copy',
+    names: 'copy dnd-copy 1081e37283d90000800003c07f3ef6bf 6407b0e94181790501fd1e167b474872',
+    filled: ARROW, lines: 'M46 38V54M38 46H54', hot: [8, 6] },
+
+  { id: 'alias', label: 'Alias / shortcut', names: 'alias dnd-link',
+    filled: ARROW, lines: 'M38 54L52 40M42 40H52V50', hot: [8, 6] },
+
+  { id: 'context-menu', label: 'Context menu', names: 'context-menu',
+    filled: ARROW, lines: 'M38 40H54M38 47H54M38 54H54', hot: [8, 6] },
+
+  // --- Zoom / cell ---
+  { id: 'zoom-in', label: 'Zoom in', names: 'zoom-in',
+    filled: '', lines: 'M26 12a14 14 0 1 0 .01 0ZM36 36L54 54M20 26H32M26 20V32', hot: [26, 26] },
+
+  { id: 'zoom-out', label: 'Zoom out', names: 'zoom-out',
+    filled: '', lines: 'M26 12a14 14 0 1 0 .01 0ZM36 36L54 54M20 26H32', hot: [26, 26] },
+
+  { id: 'cell', label: 'Cell / plus', names: 'cell plus',
+    filled: 'M26 8H38V26H56V38H38V56H26V38H8V26H26Z', lines: '', hot: [32, 32] },
+
+  // --- Resize arrows ---
+  { id: 'ew', label: 'Resize left-right',
+    names: 'ew-resize sb_h_double_arrow h_double_arrow size_hor col-resize split_h left_side right_side 14fef782d02440884392942c11205230 028006030e0e7ebffc7f7070c0600140',
+    filled: '', lines: 'M6 32H58M14 24L6 32L14 40M50 24L58 32L50 40', hot: [32, 32] },
+
+  { id: 'ns', label: 'Resize up-down',
+    names: 'ns-resize sb_v_double_arrow v_double_arrow size_ver row-resize split_v top_side bottom_side 2870a09082c103050810ffdffffe0204 00008160000006810000408080010102',
+    filled: '', lines: 'M32 6V58M24 14L32 6L40 14M24 50L32 58L40 50', hot: [32, 32] },
+
+  { id: 'nesw', label: 'Resize diagonal ⤢',
+    names: 'nesw-resize size_bdiag fd_double_arrow top_right_corner bottom_left_corner fcf1c3c7cd4491d801f1e1c78f100000',
+    filled: '', lines: 'M12 52L52 12M12 52V40M12 52H24M52 12V24M52 12H40', hot: [32, 32] },
+
+  { id: 'nwse', label: 'Resize diagonal ⤡',
+    names: 'nwse-resize size_fdiag bd_double_arrow top_left_corner bottom_right_corner c7088f0f3e6c8088236ef8e1e3e70000',
+    filled: '', lines: 'M12 12L52 52M12 12V24M12 12H24M52 52V40M52 52H40', hot: [32, 32] },
+];
+
+
+/* =====================================================================
+   SECTION 3. APPLICATION STATE
+
+   state[id] holds everything about one cursor:
+     frames  list of { img } (an Image or ImageBitmap); 1 item = static
+     hx, hy  hotspot as a fraction (0..1) of the square image
+     delay   milliseconds per frame (used when frames.length > 1)
+     custom  true once the user supplied their own image
+     tile    { button, canvas, tag } page elements for the grid tile
+   ===================================================================== */
+
+const state = {};
+let currentSlot = null;    // the cursor definition open in the editor (or null)
+
+
+/* =====================================================================
+   SECTION 4. DEFAULT ART AND IMAGE DRAWING HELPERS
+   ===================================================================== */
+
+/* Build an SVG data-URL for a cursor's default art:
+   filled shapes get a white fill + dark outline; line shapes are drawn
+   twice (thick dark line, then thinner white line on top). */
+function svgDataUrl(def) {
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 64 64"
+          stroke-linejoin="round" stroke-linecap="round">
+       <path d="${def.filled}" fill="#fff" stroke="#111" stroke-width="3"/>
+       <path d="${def.lines}" fill="none" stroke="#111" stroke-width="7"/>
+       <path d="${def.lines}" fill="none" stroke="#fff" stroke-width="3"/>
+     </svg>`;
+  return 'data:image/svg+xml,' + encodeURIComponent(svg);
+}
+
+/* Create the starting (uncustomised) state for one cursor. */
+async function makeDefaultState(def) {
+  const image = new Image();
+  image.src = svgDataUrl(def);
+  await image.decode();                       // wait until it is ready to draw
+  return {
+    frames: [{ img: image }],
+    hx: def.hot[0] / ART_GRID,
+    hy: def.hot[1] / ART_GRID,
+    delay: 100,
+    custom: false,
+  };
+}
+
+/* Draw an image into a size x size square, scaled to fit and centred.
+   Used for tiles, the editor AND the exported cursor files, so what you
+   see is exactly what gets exported. */
+function drawFit(ctx, img, size) {
+  const w = img.naturalWidth  || img.width;     // Image uses naturalWidth, ImageBitmap uses width
+  const h = img.naturalHeight || img.height;
+  const scale = Math.min(size / w, size / h);
+  ctx.drawImage(img, (size - w * scale) / 2, (size - h * scale) / 2, w * scale, h * scale);
+}
+
+/* Which frame to show right now (cycles by the clock, so all previews stay in sync). */
+function currentFrameIndex(st) {
+  if (st.frames.length < 2) return 0;
+  return Math.floor(performance.now() / st.delay) % st.frames.length;
+}
+
+
+/* =====================================================================
+   SECTION 5. DRAWING THE GRID TILES AND THE EDITOR PREVIEW
+   ===================================================================== */
+
+/* Repaint one tile in the cursor grid. */
+function drawTile(def) {
+  const st  = state[def.id];
+  const ctx = st.tile.canvas.getContext('2d');
+  ctx.clearRect(0, 0, 64, 64);
+  drawFit(ctx, st.frames[currentFrameIndex(st)].img, 64);
+  st.tile.tag.textContent = st.custom ? 'custom' : '';
+  st.tile.button.classList.toggle('on', st.custom);
+}
+
+/* Repaint the big editor preview: current frame + red hotspot crosshair. */
+function drawEditorPreview() {
+  if (!currentSlot) return;
+  const st  = state[currentSlot.id];
+  const ctx = byId('editorCanvas').getContext('2d');
+  const x = st.hx * 256, y = st.hy * 256;
+
+  ctx.clearRect(0, 0, 256, 256);
+  drawFit(ctx, st.frames[currentFrameIndex(st)].img, 256);
+
+  ctx.strokeStyle = '#e03131';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x, 0); ctx.lineTo(x, 256);     // vertical line
+  ctx.moveTo(0, y); ctx.lineTo(256, y);     // horizontal line
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(x, y, 6, 0, 7);                   // small circle at the hotspot
+  ctx.stroke();
+}
+
+/* Animation ticker: refresh animated tiles and the editor preview. */
+setInterval(() => {
+  CURSOR_SLOTS.forEach(def => {
+    if (state[def.id] && state[def.id].frames.length > 1) drawTile(def);
+  });
+  drawEditorPreview();
+}, TICK_MS);
+
+
+/* =====================================================================
+   SECTION 6. THE EDITOR WINDOW
+   ===================================================================== */
+
+/* Text such as "(32, 6 on a 64 px grid)". */
+function hotspotLabel(st) {
+  return `(${Math.round(st.hx * 64)}, ${Math.round(st.hy * 64)} on a 64 px grid)`;
+}
+
+/* Update every editor control to match the current cursor's state. */
+function refreshEditor() {
+  const st = state[currentSlot.id];
+  const count = st.frames.length;
+
+  byId('hotspotText').textContent = hotspotLabel(st);
+
+  // The speed slider only appears for animations (2+ frames).
+  byId('speedBox').hidden = count < 2;
+  byId('speedSlider').value = st.delay;
+  byId('speedLabel').textContent =
+    `${st.delay} ms (~${(1000 / st.delay).toFixed(1)} fps), ${count} frames`;
+
+  // Thumbnail strip with a remove (×) button per frame.
+  const strip = byId('frameStrip');
+  strip.innerHTML = '';
+  if (!st.custom) return;
+  st.frames.forEach((frame, index) => {
+    const wrap = document.createElement('div');
+    const thumb = document.createElement('canvas');
+    thumb.width = thumb.height = 40;
+    drawFit(thumb.getContext('2d'), frame.img, 40);
+
+    const remove = document.createElement('button');
+    remove.textContent = '×';
+    remove.title = 'Remove frame';
+    remove.onclick = async () => {
+      st.frames.splice(index, 1);
+      if (!st.frames.length) Object.assign(st, await makeDefaultState(currentSlot));
+      refreshEditor();
+    };
+
+    wrap.append(thumb, remove);
+    strip.append(wrap);
+  });
+}
+
+function openEditor(def) {
+  currentSlot = def;
+  byId('editorTitle').textContent = def.label;
+  refreshEditor();
+  byId('editor').showModal();
+}
+
+/* Read the chosen files into frames.
+   append = true  keeps existing frames and adds to them
+   append = false replaces them. */
+async function loadFiles(fileList, append) {
+  // Natural sort so frame2.png comes before frame10.png.
+  const files = [...fileList].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { numeric: true }));
+
+  const st = state[currentSlot.id];
+  let frames = append && st.custom ? [...st.frames] : [];
+  let gifDelay = 0;                          // average GIF frame time, if a GIF was loaded
+
+  for (const file of files) {
+    try {
+      const isGif = file.type === 'image/gif' || /\.gif$/i.test(file.name);
+
+      if (isGif && window.ImageDecoder) {
+        // Animated GIF: decode every frame (Chromium-based browsers).
+        const decoder = new ImageDecoder({ data: file.stream(), type: 'image/gif' });
+        await decoder.tracks.ready;
+        const total = Math.min(decoder.tracks.selectedTrack.frameCount, MAX_FRAMES);
+        let totalMs = 0;
+        for (let i = 0; i < total; i++) {
+          const result = await decoder.decode({ frameIndex: i });
+          frames.push({ img: await createImageBitmap(result.image) });
+          totalMs += (result.image.duration || 100000) / 1000;   // duration is in microseconds
+          result.image.close();
+        }
+        if (total > 1) gifDelay = totalMs / total;
+      } else {
+        // Ordinary image (or a GIF in a browser without ImageDecoder: first frame only).
+        frames.push({ img: await createImageBitmap(file) });
+      }
+    } catch (err) {
+      showMessage('Could not read ' + file.name);
+    }
+  }
+
+  if (!frames.length) return;
+  if (frames.length > MAX_FRAMES) {
+    frames = frames.slice(0, MAX_FRAMES);
+    showMessage('Limited to ' + MAX_FRAMES + ' frames');
+  }
+
+  st.frames = frames;
+  st.custom = true;
+  if (gifDelay) st.delay = Math.min(1000, Math.max(20, Math.round(gifDelay)));
+  refreshEditor();
+}
+
+/* --- Editor buttons and inputs --- */
+byId('fileReplace').onchange = e => { loadFiles(e.target.files, false); e.target.value = ''; };
+byId('fileAdd').onchange     = e => { loadFiles(e.target.files, true);  e.target.value = ''; };
+
+byId('speedSlider').oninput = e => {
+  state[currentSlot.id].delay = +e.target.value;
+  refreshEditor();
+};
+
+byId('hotTopLeft').onclick = () => { Object.assign(state[currentSlot.id], { hx: 0,  hy: 0  }); refreshEditor(); };
+byId('hotCenter').onclick  = () => { Object.assign(state[currentSlot.id], { hx: .5, hy: .5 }); refreshEditor(); };
+
+byId('resetBtn').onclick = async () => {
+  Object.assign(state[currentSlot.id], await makeDefaultState(currentSlot));
+  refreshEditor();
+};
+
+byId('doneBtn').onclick = byId('closeBtn').onclick = () => byId('editor').close();
+
+byId('editor').onclose = () => {            // refresh the tiles whenever the editor closes
+  CURSOR_SLOTS.forEach(drawTile);
+  currentSlot = null;
+};
+
+/* --- Hotspot picking: tap or drag on the preview --- */
+function pickHotspot(event) {
+  const box = byId('editorCanvas').getBoundingClientRect();
+  const st  = state[currentSlot.id];
+  st.hx = Math.min(1, Math.max(0, (event.clientX - box.left) / box.width));
+  st.hy = Math.min(1, Math.max(0, (event.clientY - box.top)  / box.height));
+  byId('hotspotText').textContent = hotspotLabel(st);
+}
+let dragging = false;
+byId('editorCanvas').onpointerdown = e => {
+  dragging = true;
+  byId('editorCanvas').setPointerCapture(e.pointerId);
+  pickHotspot(e);
+};
+byId('editorCanvas').onpointermove = e => { if (dragging) pickHotspot(e); };
+byId('editorCanvas').onpointerup   = () => { dragging = false; };
+
+
+/* =====================================================================
+   SECTION 7. XCURSOR ENCODER  (builds the binary cursor file)
+
+   Xcursor file layout (all numbers are 32-bit LITTLE-endian):
+     header    magic "Xcur", header size 16, version 0x10000, entry count
+     TOC       one 12-byte entry per image: type, size, file position
+     chunks    one per image: 36-byte header, then the pixels
+   Pixels are premultiplied ARGB, stored on disk as bytes B, G, R, A.
+   Animation frames of one size sit next to each other, sharing a delay.
+   ===================================================================== */
+
+const XCURSOR_MAGIC      = 0x72756358;   // bytes 58 63 75 72 = "Xcur" when little-endian
+const XCURSOR_IMAGE_TYPE = 0xfffd0002;   // chunk type meaning "image"
+
+/* Turn one cursor's frames into the bytes of an Xcursor file.
+   st = the cursor state, sizes = pixel sizes such as [24, 32, 48]. */
+function buildXcursor(st, sizes) {
+  // ---- Step 1: render every frame at every size into premultiplied BGRA ----
+  const images = [];
+  for (const size of sizes) {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = size;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.imageSmoothingQuality = 'high';
+
+    for (const frame of st.frames) {
+      ctx.clearRect(0, 0, size, size);
+      drawFit(ctx, frame.img, size);
+      const rgba = ctx.getImageData(0, 0, size, size).data;   // straight (not premultiplied) RGBA
+      const bgra = new Uint8Array(size * size * 4);
+
+      for (let i = 0; i < rgba.length; i += 4) {
+        const alpha = rgba[i + 3];
+        bgra[i]     = rgba[i + 2] * alpha / 255 | 0;   // B x alpha
+        bgra[i + 1] = rgba[i + 1] * alpha / 255 | 0;   // G x alpha
+        bgra[i + 2] = rgba[i]     * alpha / 255 | 0;   // R x alpha
+        bgra[i + 3] = alpha;                           // A
+      }
+
+      images.push({
+        size,
+        pixels: bgra,
+        hotX: Math.min(size - 1, Math.round(st.hx * size)),   // hotspot must stay inside the image
+        hotY: Math.min(size - 1, Math.round(st.hy * size)),
+      });
+    }
+  }
+
+  // ---- Step 2: work out the total file length ----
+  const count      = images.length;
+  const headerSize = 16 + count * 12;                // file header + table of contents
+  let total = headerSize;
+  images.forEach(im => total += 36 + im.pixels.length);
+
+  const bytes = new Uint8Array(total);
+  const view  = new DataView(bytes.buffer);
+  const delay = st.frames.length > 1 ? st.delay : 0;   // 0 = not animated
+
+  // ---- Step 3: file header (4 numbers, little-endian: the "true" argument) ----
+  [XCURSOR_MAGIC, 16, 0x10000, count].forEach((value, i) => view.setUint32(i * 4, value, true));
+
+  // ---- Step 4: table of contents + image chunks ----
+  let position = headerSize;                          // where the next chunk will start
+  images.forEach((im, index) => {
+    const toc = 16 + index * 12;
+    view.setUint32(toc,      XCURSOR_IMAGE_TYPE, true);   // entry type
+    view.setUint32(toc + 4,  im.size,            true);   // entry "subtype" = nominal size
+    view.setUint32(toc + 8,  position,           true);   // where the chunk is in the file
+
+    // Chunk header: 9 numbers = 36 bytes
+    [36, XCURSOR_IMAGE_TYPE, im.size, 1, im.size, im.size, im.hotX, im.hotY, delay]
+      .forEach((value, j) => view.setUint32(position + j * 4, value, true));
+    //  header size, type, size, version, width, height, hotspot x, hotspot y, delay (ms)
+
+    bytes.set(im.pixels, position + 36);               // pixel data follows the header
+    position += 36 + im.pixels.length;
+  });
+
+  return bytes;
+}
+
+
+/* =====================================================================
+   SECTION 8. ZIP WRITER  (a minimal, uncompressed ".zip" builder)
+
+   A zip is: [local header + file data] for each file, then a "central
+   directory" listing every file, then one "end of directory" record.
+   Numbers are little-endian. Files are stored without compression.
+   ===================================================================== */
+
+/* CRC-32 checksum, which every zip entry needs.
+   The table is calculated once; crc32() then walks the bytes. */
+const CRC_TABLE = new Uint32Array(256).map((_, n) => {
+  for (let bit = 0; bit < 8; bit++) n = n & 1 ? 0xEDB88320 ^ (n >>> 1) : n >>> 1;
+  return n >>> 0;
+});
+function crc32(data) {
+  let crc = -1;
+  for (let i = 0; i < data.length; i++) crc = CRC_TABLE[(crc ^ data[i]) & 255] ^ (crc >>> 8);
+  return (crc ^ -1) >>> 0;
+}
+
+/* files = [{ n: 'path/in/zip', d: Uint8Array, x: true if executable }]
+   Returns a Blob ready to download. */
+function buildZip(files) {
+  const encoder = new TextEncoder();
+  const body = [];            // local headers + names + data
+  const directory = [];       // central-directory records + names
+  const now = new Date();
+  const dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+  let offset = 0;             // running position of each local header
+
+  for (const file of files) {
+    const name  = encoder.encode(file.n);
+    const crc   = crc32(file.d);
+    const local = new DataView(new ArrayBuffer(30));     // local file header (30 bytes)
+    const entry = new DataView(new ArrayBuffer(46));     // central directory record (46 bytes)
+    const unixMode = file.x ? 0o100755 : 0o100644;       // rwxr-xr-x or rw-r--r--
+
+    // --- Local file header ---
+    local.setUint32(0,  0x04034b50, true);     // signature
+    local.setUint16(4,  20,         true);     // version needed to extract
+    local.setUint16(6,  0x800,      true);     // flags: file names are UTF-8
+    local.setUint16(8,  0,          true);     // method 0 = stored (no compression)
+    local.setUint16(12, dosDate,    true);     // modified date (time left as 0)
+    local.setUint32(14, crc,        true);     // CRC-32
+    local.setUint32(18, file.d.length, true);  // compressed size (= original size)
+    local.setUint32(22, file.d.length, true);  // original size
+    local.setUint16(26, name.length, true);    // file name length
+
+    // --- Central directory record ---
+    entry.setUint32(0,  0x02014b50, true);     // signature
+    entry.setUint16(4,  0x031e,     true);     // made by: Unix (so permissions are honoured)
+    entry.setUint16(6,  20,         true);     // version needed to extract
+    entry.setUint16(8,  0x800,      true);     // flags: UTF-8 names
+    entry.setUint16(14, dosDate,    true);     // modified date
+    entry.setUint32(16, crc,        true);     // CRC-32
+    entry.setUint32(20, file.d.length, true);  // compressed size
+    entry.setUint32(24, file.d.length, true);  // original size
+    entry.setUint16(28, name.length, true);    // file name length
+    entry.setUint32(38, (unixMode << 16) >>> 0, true);  // external attributes: Unix mode in high 16 bits
+    entry.setUint32(42, offset,     true);     // where this file's local header starts
+
+    body.push(local, name, file.d);
+    directory.push(entry, name);
+    offset += 30 + name.length + file.d.length;
+  }
+
+  // --- End of central directory record ---
+  let directorySize = 0;
+  directory.forEach(part => directorySize += part.byteLength);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0,  0x06054b50, true);         // signature
+  end.setUint16(8,  files.length, true);       // entries on this disk
+  end.setUint16(10, files.length, true);       // total entries
+  end.setUint32(12, directorySize, true);      // size of the central directory
+  end.setUint32(16, offset, true);             // where the central directory starts
+
+  return new Blob([...body, ...directory, end]);
+}
+
+
+/* =====================================================================
+   SECTION 9. INSTALL INSTRUCTIONS AND install.sh
+   ===================================================================== */
+
+/* Theme name made safe for file names and shell scripts:
+   only letters, digits, "_" and "-"; no leading "-". */
+function getThemeName() {
+  const typed = byId('themeName').value.trim() || 'MyCursor';
+  return typed.replace(/[^\w-]/g, '_').replace(/^-+/, '') || 'MyCursor';
+}
+
+/* Contents of the install.sh file that goes in the zip. */
+function buildInstallScript(name, linuxType) {
+  const destination = linuxType === 'other' ? '$HOME/.icons' : '$HOME/.local/share/icons';
+
+  // The last step differs per desktop: activate the theme if possible.
+  const activate = {
+    ubuntu: 'gsettings set org.gnome.desktop.interface cursor-theme "$NAME" 2>/dev/null || echo "Select it in GNOME Tweaks > Appearance > Cursor"',
+    kde:    'plasma-apply-cursortheme "$NAME" 2>/dev/null || echo "Select it in System Settings > Appearance > Cursors"',
+    other:  'xfconf-query -c xsettings -p /Gtk/CursorThemeName -s "$NAME" 2>/dev/null || true\n' +
+            'gsettings set org.gnome.desktop.interface cursor-theme "$NAME" 2>/dev/null || true\n' +
+            'echo "If it did not change, select it in your desktop Appearance/Mouse settings."',
+  }[linuxType];
+
+  return `#!/bin/sh
+set -e
+NAME="${name}"
+DEST="${destination}"
+cd "$(dirname "$0")"
+mkdir -p "$DEST"
+rm -rf "$DEST/$NAME"
+cp -r "$NAME" "$DEST/"
+${activate}
+echo "Installed $NAME into $DEST"
+`;
+}
+
+/* Rewrite the on-page install steps for the chosen Linux type and theme name. */
+function renderInstructions() {
+  const name = getThemeName();
+  const type = byId('linuxType').value;
+  const folder = type === 'other' ? '~/.icons' : '~/.local/share/icons';
+
+  const lastStep = {
+    ubuntu: `Open <b>GNOME Tweaks</b> (<code>sudo apt install gnome-tweaks</code>) → <b>Appearance → Cursor</b> and choose <b>${name}</b>. Or run <code>gsettings set org.gnome.desktop.interface cursor-theme '${name}'</code>.`,
+    kde:    `Open <b>System Settings → Appearance → Cursors</b> and choose <b>${name}</b>, then press Apply.`,
+    other:  `Xfce: <b>Settings → Mouse and Touchpad → Theme</b>. Cinnamon: <b>Themes → Mouse Pointer</b>. MATE: <b>Appearance → Pointer</b>. Others: create <code>~/.icons/default/index.theme</code> containing <code>[Icon Theme]</code> and <code>Inherits=${name}</code>.`,
+  }[type];
+
+  byId('installSteps').innerHTML =
+    `<li>Unzip <code>${name}.zip</code>. You get a folder <code>${name}</code> and a file <code>install.sh</code>.</li>
+     <li><b>Easy way:</b> open a terminal in that folder and run <code>sh install.sh</code>. It copies the theme to <code>${folder}</code> and activates it.</li>
+     <li><b>Manual way:</b> copy the <code>${name}</code> folder into <code>${folder}</code> (create the folder if needed), then:</li>
+     <li>${lastStep}</li>`;
+}
+
+byId('linuxType').onchange = renderInstructions;
+byId('themeName').oninput  = renderInstructions;
+
+
+/* =====================================================================
+   SECTION 10. BUILD AND DOWNLOAD
+   ===================================================================== */
+
+byId('buildBtn').onclick = async () => {
+  const name      = getThemeName();
+  const type      = byId('linuxType').value;
+  const onlyCustom = byId('onlyCustom').checked;
+  const included  = CURSOR_SLOTS.filter(def => !onlyCustom || state[def.id].custom);
+  const sizes     = [...document.querySelectorAll('.size-box:checked')].map(box => +box.value);
+
+  // Basic checks before doing any work.
+  if (!included.length) return showMessage('Customise at least one cursor first, or untick “Only include…”.');
+  if (!sizes.length)    return showMessage('Select at least one size.');
+
+  byId('buildBtn').disabled = true;
+  showMessage('Building…');
+  await new Promise(resolve => setTimeout(resolve, 30));   // let the "Building…" text paint first
+
+  try {
+    const encoder = new TextEncoder();
+
+    // 1) index.theme: tells Linux this folder is a cursor theme.
+    //    "Inherits=Adwaita" supplies any cursor we did not include.
+    const files = [{
+      n: `${name}/index.theme`,
+      d: encoder.encode(`[Icon Theme]\nName=${name}\nComment=Made with Cursor Forge\nInherits=Adwaita\n`),
+    }];
+
+    // 2) One Xcursor file per cursor, copied under every alias name.
+    for (const def of included) {
+      const bytes = buildXcursor(state[def.id], sizes);
+      for (const alias of def.names.split(' ')) {
+        files.push({ n: `${name}/cursors/${alias}`, d: bytes });
+      }
+    }
+
+    // 3) install.sh (executable).
+    files.push({ n: 'install.sh', d: encoder.encode(buildInstallScript(name, type)), x: true });
+
+    // 4) Safety check on the total size.
+    const totalBytes = files.reduce((sum, f) => sum + f.d.length, 0);
+    if (totalBytes > MAX_ZIP_BYTES) {
+      throw new Error('Theme would be ' + Math.round(totalBytes / 1e6) +
+        ' MB; use fewer sizes, fewer frames or fewer animated cursors.');
+    }
+
+    // 5) Zip it and hand it to the user.
+    const blob = buildZip(files);
+    const downloads = window.claude ? await window.claude.use('downloads') : null;
+    if (downloads) {
+      await downloads.save({ filename: name + '.zip', data: blob });   // hosted-page download
+    } else {
+      const link = document.createElement('a');                        // normal browser download
+      link.href = URL.createObjectURL(blob);
+      link.download = name + '.zip';
+      link.click();
+    }
+    showMessage('Done! See the install steps below.');
+  } catch (err) {
+    showMessage(err && err.code === 'declined' ? 'Download cancelled.' : 'Build failed: ' + (err.message || err));
+  }
+
+  byId('buildBtn').disabled = false;
+};
+
+
+/* =====================================================================
+   SECTION 11. START-UP
+   ===================================================================== */
+
+// Size checkboxes (24, 32, 48, 64 ticked by default).
+byId('sizeBoxes').innerHTML = ALL_SIZES.map(size =>
+  `<label style="margin-right:8px">
+     <input type="checkbox" class="size-box" value="${size}" ${DEFAULT_SIZES.includes(size) ? 'checked' : ''}> ${size}
+   </label>`).join('');
+
+// Create a state entry and a grid tile for every cursor.
+(async () => {
+  for (const def of CURSOR_SLOTS) {
+    state[def.id] = await makeDefaultState(def);
+
+    const button = document.createElement('button');
+    button.className = 'card';
+    button.innerHTML =
+      '<span class="tag"></span>' +
+      '<canvas width="64" height="64" style="width:64px;height:64px"></canvas>' +
+      '<span>' + def.label + '</span>';
+    button.onclick = () => openEditor(def);
+
+    state[def.id].tile = {
+      button,
+      canvas: button.querySelector('canvas'),
+      tag:    button.querySelector('.tag'),
+    };
+    byId('grid').append(button);
+    drawTile(def);
+  }
+})();
+
+renderInstructions();
+</script>
+</body>
+</html>
